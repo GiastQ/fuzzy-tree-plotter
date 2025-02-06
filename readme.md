@@ -17,7 +17,7 @@ Before running the script, install the following dependencies:
 
 ```bash
 pip install graphviz
-
+---
 
 ## 🚀 Usage
 Follow these steps to use **FuzzyTreePlotter** in your project.
