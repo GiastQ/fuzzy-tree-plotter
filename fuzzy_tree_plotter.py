@@ -1,39 +1,75 @@
 # !/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Feb 5 2025
+Created on Sat Apr 6 2025
 
 @author: Giustino C. Miglionico
 """
 
 from graphviz import Digraph
+import os, re
 
 class FuzzyTreePlotter:
     def __init__(self, rules, aggrega=False, text_size=12, line_width=1, edge_text_size=12):
-        """Classe per costruire e visualizzare un albero fuzzy a partire da regole fuzzy."""
-        self.rules = rules
+        """
+        Class for building and visualizing a fuzzy decision tree from fuzzy rules.
+        Accepts either a list of rules or a path to a .txt file (one rule per line).
+        """
+        self.rules = self._load_rules(rules)
         self.aggrega = aggrega
         self.text_size = text_size
         self.line_width = line_width
         self.edge_text_size = edge_text_size
         self.tree = self._build_tree()
-        self.counter = 0  # Inizializza il contatore
+        self.counter = 0
         self.dot = self._build_graphviz_tree()
 
+    def _load_rules(self, source):
+        """Loads rules from a list or from a text file."""
+        if isinstance(source, list):
+            return source
+
+        elif isinstance(source, str) and os.path.isfile(source):
+            try:
+                with open(source, "r", encoding="utf-8") as f:
+                    lines = [line.strip() for line in f if line.strip()]
+            except Exception as e:
+                print(f"[WARNING] Failed to open rules file: {source}\n  → {e}")
+                return []
+
+            if not lines:
+                print(f"[WARNING] Rules file '{source}' is empty or contains only blank lines.")
+
+            return lines
+
+        else:
+            raise ValueError("The 'rules' parameter must be a list of strings or a valid path to a .txt file.")
+
+
     def _parse_rule(self, rule):
-        """Parsa una regola fuzzy e restituisce una tupla (conditions, outcome)."""
+        """Parses a fuzzy rule and returns a tuple (conditions, outcome)."""
         rule = rule.strip()
-        if rule.lower().startswith("if "):
-            rule = rule[3:]
-        if " then " not in rule:
-            raise ValueError("Formato regola non valido (manca 'then'): " + rule)
-        conditions_part, outcome_part = rule.split(" then ", 1)
+        rule = re.sub(r"(?i)^if\s+", "", rule)
+        parts = re.split(r"(?i)\s+then\s+", rule)
+
+        if len(parts) != 2:
+            raise ValueError("Invalid rule format (missing 'then'): " + rule)
+
+        conditions_part, outcome_part = parts
         outcome = outcome_part.strip()
-        conditions = [tuple(c.strip().split(" is ")) for c in conditions_part.split(" and ")]
+        raw_conditions = re.split(r"(?i)\s+and\s+", conditions_part.strip())
+        conditions = []
+        for cond in raw_conditions:
+            cond_parts = re.split(r"(?i)\s+is\s+", cond.strip())
+            if len(cond_parts) != 2:
+                raise ValueError("Malformed condition: " + cond)
+            attr, value = cond_parts
+            conditions.append((attr.strip(), value.strip()))
+
         return conditions, outcome
 
     def _insert_into_tree(self, tree, conditions, outcome):
-        """Inserisce una regola nella struttura ad albero."""
+        """Inserts a rule into the tree structure."""
         if not conditions:
             tree['_leaf'] = outcome
             return
@@ -45,7 +81,7 @@ class FuzzyTreePlotter:
         self._insert_into_tree(tree[attr][value], conditions[1:], outcome)
 
     def _build_tree(self):
-        """Costruisce la struttura ad albero a partire dalle regole."""
+        """Builds the tree structure from rules."""
         tree = {}
         for rule in self.rules:
             conditions, outcome = self._parse_rule(rule)
@@ -53,7 +89,7 @@ class FuzzyTreePlotter:
         return tree
 
     def _traverse_tree(self, dot, tree, parent_id=None, edge_label=""):
-        """Crea il grafo Graphviz in base alla struttura ad albero."""
+        """Creates the Graphviz graph based on the tree structure."""
         leaves = []
         if '_leaf' in tree and len(tree) == 1:
             leaf_id = f"leaf_{self.counter}"
@@ -91,12 +127,12 @@ class FuzzyTreePlotter:
         return leaves
 
     def _build_graphviz_tree(self):
-        """Crea il grafo Graphviz per la visualizzazione dell'albero fuzzy."""
+        """Creates the Graphviz graph for fuzzy tree visualization."""
         dot = Digraph(comment="Fuzzy Decision Tree", graph_attr={'rankdir': 'TB'})
         dot.node_attr.update(fontsize=str(self.text_size))
         dot.edge_attr.update(penwidth=str(self.line_width), fontsize=str(self.edge_text_size))
 
-        self.counter = 0  # Inizializza il contatore prima della traversata
+        self.counter = 0  # Reset counter before traversal
         leaf_ids = self._traverse_tree(dot, self.tree)
 
         with dot.subgraph() as s:
@@ -107,5 +143,5 @@ class FuzzyTreePlotter:
         return dot
 
     def render(self, filename="fuzzy_tree", format="png", view=True):
-        """Renderizza e salva l'albero fuzzy in un file."""
+        """Renders and saves the fuzzy tree to a file."""
         self.dot.render(filename, format=format, view=view)
