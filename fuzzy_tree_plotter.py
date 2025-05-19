@@ -143,5 +143,14 @@ class FuzzyTreePlotter:
         return dot
 
     def render(self, filename="fuzzy_tree", format="png", view=True):
-        """Renders and saves the fuzzy tree to a file."""
-        self.dot.render(filename, format=format, view=view)
+        """
+        Renders the fuzzy tree image and saves only the image file (removes the .gv source file).
+        """
+        output_path = self.dot.render(filename, format=format, view=view)
+
+        # Remove the .gv source file if it exists
+        source_file = f"{filename}"
+        if os.path.exists(source_file):
+            os.remove(source_file)
+
+        return output_path
